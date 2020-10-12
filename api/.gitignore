@@ -1,6 +1,7 @@
+# Código gitignore para evitar procesar los directorios de las dependencias
 *.log
 log.txt
 npm-debug.log*
 
-/node_modules
+node_modules
 /.vscode
