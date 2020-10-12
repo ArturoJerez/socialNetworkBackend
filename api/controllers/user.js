@@ -9,6 +9,7 @@ var path = require('path');
 // Cargar Modelos y Servicios
 var User = require('../models/user');
 var Follow = require('../models/follow');
+var Publication = require('../models/publication');
 var jwt = require('../services/jwt');
 const { exists } = require('../models/user');
 const { deprecate } = require('util');
@@ -235,9 +236,18 @@ async function get_count_follows(user_id) {
         return handleError(err);
     });
 
+    var publications = await Publication.count({"user": user_id}).exec()
+    .then((count) => {
+        return count;
+    })
+    .catch((err) => {
+        return handleError(err);
+    });
+
     return {
         following: following,
-        followed: followed
+        followed: followed,
+        publications: publications
     }
 }
 
@@ -280,10 +290,10 @@ function upload_image(req, res) {
 
         if(file_ext == 'png' || file_ext == 'jpg' || file_ext == 'jpeg' || file_ext == 'gif') {
             // Actualizar documento de usuario logueado
-            User.findByIdAndUpdate(userId, {image: file_name}, {new:true}, (err, userUpdated) => {
+            User.findByIdAndUpdate(userId, {image: file_name}, {new:true}, (err, user_updated) => {
                 if(err) return res.status(500).send({message: 'Error en la petición'});
-                if(!userUpdated) return res.status(404).send({message: 'No se ha podido actualizar el usuario'});
-                return res.status(200).send({user: userUpdated});
+                if(!user_updated) return res.status(404).send({message: 'No se ha podido actualizar el usuario'});
+                return res.status(200).send({user: user_updated});
             });
         } else {
             return remove_files_uploaded(res, file_path, 'Extensión no válida');
