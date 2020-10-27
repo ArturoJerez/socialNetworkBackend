@@ -263,11 +263,25 @@ function update_user(req, res) {
         return res.status(500).send({message: 'No tienes permisos para actualizar los datos del usuario'});
     }
 
-    User.findByIdAndUpdate(userId, update, {new:true}, (err, userUpdated) => {
-        if(err) return res.status(500).send({message: 'Error en la petición'});
-        if(!userUpdated) return res.status(404).send({message: 'No se ha podido actualizar el usuario'});
-        return res.status(200).send({user: userUpdated});
+    User.find({ $or: [ // Comprobar si ya existe un usuario con email o nick
+        {email: update.email.toLowerCase()},
+        {nick: update.nick.toLowerCase()}
+    ]}).exec((err, users) => {
+        console.log(users);
+        var user_isset = false;
+        users.forEach((user) => {
+            if(user && user._id != userId) user_isset = true;
+        });
+
+        if(user_isset) return res.status(404).send({message: 'Los datos ya estan en uso'});
+
+        User.findByIdAndUpdate(userId, update, {new:true}, (err, userUpdated) => {
+            if(err) return res.status(500).send({message: 'Error en la petición'});
+            if(!userUpdated) return res.status(404).send({message: 'No se ha podido actualizar el usuario'});
+            return res.status(200).send({user: userUpdated});
+        });
     });
+
 }
 
 // Subir imagen/avatar del usuario
