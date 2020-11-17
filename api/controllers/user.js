@@ -15,18 +15,6 @@ const { exists } = require('../models/user');
 const { deprecate } = require('util');
 const { relativeTimeRounding } = require('moment');
 
-function home(req, res) {
-    res.status(200).send({
-        message: 'Hola Mundo desde la raíz'
-    });
-}
-
-function pruebas (req, res) {
-    res.status(200).send({
-        message: 'Acción de pruebas'
-    });
-}
-
 // Registro
 function save_user(req, res) {
     var params = req.body;
@@ -112,12 +100,11 @@ function login_user(req, res) {
 
 function get_user(req, res) {
     var userId = req.params.id;
-  
     User.findById(userId, (err, user) => {
-        if (!user) return res.status(404).send({message: "User Not Found."});
-        if (err) return res.status(500).send({message: "Request Error."});
-  
-        follow_user(req.user.sub, userId).then((value) => {
+        if (err) return res.status(500).send({ message: 'Error en la petición' });
+        if (!user) return res.status(404).send({ message: 'El usuario no existe' });
+        followThisUser(req.user.sub, userId).then((value) => {
+            user.password = undefined;
             return res.status(200).send({
                 user,
                 following: value.following,
@@ -127,26 +114,30 @@ function get_user(req, res) {
     });
  }
   
- async function follow_user(identity_user_id, user_id) {
-    var following = await Follow.findOne({ user: identity_user_id, followed: user_id }).exec()
-        .then((following) => {
-            return following;
-        })
-        .catch((err) => {
-            return handleError(err);
-        });
-    var followed = await Follow.findOne({ user: user_id, followed: identity_user_id }).exec()
-        .then((followed) => {
-            return followed;
-        })
-        .catch((err) => {
-            return handleError(err);
-        });
-  
-    return {
-        following: following,
-        followed: followed
-    };
+ async function followThisUser(identity_user_id, user_id) {
+    try {
+        var following = await Follow.findOne({ user: identity_user_id, followed: user_id }).exec()
+            .then((following) => {
+                return following;
+            })
+            .catch((err) => {
+                return handleError(err);
+            });
+        var followed = await Follow.findOne({ user: user_id, followed: identity_user_id }).exec()
+            .then((followed) => {
+                return followed;
+            })
+            .catch((err) => {
+                return handleError(err);
+            });
+    
+        return {
+            following: following,
+            followed: followed
+        };
+    } catch (e) {
+        console.log(e);
+    }
  }
 
 // Devuelve un listado de usuarios paginados
@@ -157,7 +148,7 @@ function get_users(req, res) {
     if(req.params.page){
         page = req.params.page;
     }
-    var itemsPerPage = 5;
+    var itemsPerPage = 8;
      
     User.find().sort('_id').paginate(page,itemsPerPage,(err,users,total)=>{
         if(err) return res.status(500).send({message:"Error en la peticion",err});
@@ -184,7 +175,7 @@ async function follow_users_ids(user_id) {
             return handleError(err);
         });
     
-    var followed = await Follow.find({followed:user_id}).select({'_id': 0, '__v': 0, 'followed': 0}).exec()
+    var followed = await Follow.find({followed: user_id}).select({'_id': 0, '__v': 0, 'followed': 0}).exec()
         .then((follows) => {
             return follows;
         })
@@ -214,13 +205,13 @@ function get_counters(req, res) {
         userId = req.params.id;
     }
     
-    get_count_follows(req.params.id).then((value) => {
+    get_count_follows(userId).then((value) => {
         return res.status(200).send(value);
     });
 }
 
 async function get_count_follows(user_id) {
-    var following = await Follow.count({"user": user_id}).exec()
+    var following = await Follow.countDocuments({"user": user_id}).exec()
     .then((count) => {
         return count;
     })
@@ -228,7 +219,7 @@ async function get_count_follows(user_id) {
         return handleError(err);
     });
 
-    var followed = await Follow.count({"followed": user_id}).exec()
+    var followed = await Follow.countDocuments({"followed": user_id}).exec()
     .then((count) => {
         return count;
     })
@@ -236,7 +227,7 @@ async function get_count_follows(user_id) {
         return handleError(err);
     });
 
-    var publications = await Publication.count({"user": user_id}).exec()
+    var publications = await Publication.countDocuments({"user": user_id}).exec()
     .then((count) => {
         return count;
     })
@@ -263,11 +254,25 @@ function update_user(req, res) {
         return res.status(500).send({message: 'No tienes permisos para actualizar los datos del usuario'});
     }
 
-    User.findByIdAndUpdate(userId, update, {new:true}, (err, userUpdated) => {
-        if(err) return res.status(500).send({message: 'Error en la petición'});
-        if(!userUpdated) return res.status(404).send({message: 'No se ha podido actualizar el usuario'});
-        return res.status(200).send({user: userUpdated});
+    User.find({ $or: [ // Comprobar si ya existe un usuario con email o nick
+        {email: update.email.toLowerCase()},
+        {nick: update.nick.toLowerCase()}
+    ]}).exec((err, users) => {
+        console.log(users);
+        var user_isset = false;
+        users.forEach((user) => {
+            if(user && user._id != userId) user_isset = true;
+        });
+
+        if(user_isset) return res.status(404).send({message: 'Los datos ya estan en uso'});
+
+        User.findByIdAndUpdate(userId, update, {new:true}, (err, userUpdated) => {
+            if(err) return res.status(500).send({message: 'Error en la petición'});
+            if(!userUpdated) return res.status(404).send({message: 'No se ha podido actualizar el usuario'});
+            return res.status(200).send({user: userUpdated});
+        });
     });
+
 }
 
 // Subir imagen/avatar del usuario
@@ -325,8 +330,6 @@ function get_image_file(req, res) {
 
 
 module.exports = {
-    home,
-    pruebas,
     save_user,
     login_user,
     get_user,

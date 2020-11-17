@@ -4,7 +4,7 @@ var app = require('./app');
 
 // Conexión DB
 mongoose.Promise = global.Promise;
-mongoose.connect('mongodb://localhost:27017/social_network', { useMongoClient: true })
+mongoose.connect('mongodb://localhost:27017/social_network', {useUnifiedTopology: true, useNewUrlParser: true})
     .then(() => {
         console.log("La conexión a la base de datos social_network se ha realizado correctamente.")
 

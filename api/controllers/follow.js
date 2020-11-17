@@ -27,7 +27,7 @@ function delete_follow(req, res) { // Eliminar seguimiento del usuario
     var userId = req.user.sub;
     var followId = req.params.id;
     
-    Follow.find({'user': userId, 'followed': followId}).remove(err => {
+    Follow.find({'user': userId, 'followed': followId}).deleteOne(err => {
         if (err) return res.status(500).send({message:'Error al dejar de seguir'});
         return res.status(200).send({message:'Se ha eliminado el seguimiento'});
     });
@@ -47,16 +47,54 @@ function get_following_users(req, res) {
         page = req.params.id;
     }
 
-    var items_per_page = 4;
+    var items_per_page = 8;
     Follow.find({user: userId}).populate({path: 'followed'}).paginate(page, items_per_page, (err, follows, total) => {
         if (err) return res.status(500).send({message:'Error en el servidor'});
         if (!follows) return res.status(404).send({message:'No sigue a ningún usuario'});
-        return res.status(200).send({
-            total: total,
-            pages: Math.ceil(total/items_per_page),
-            follows
+
+        follow_users_ids(req.user.sub).then((response) => {
+            return res.status(200).send({
+                total: total,
+                pages: Math.ceil(total/items_per_page),
+                follows,
+                users_following: response.following, 
+                users_followed: response.followed
+            });
         });
     });
+}
+
+async function follow_users_ids(user_id) {
+    var following = await Follow.find({'user': user_id}).select({'_id': 0, '__v': 0, 'user': 0}).exec()
+        .then((follows) => {
+            return follows;
+        })
+        .catch((err) => {
+            return handleError(err);
+        });
+    
+    var followed = await Follow.find({followed: user_id}).select({'_id': 0, '__v': 0, 'followed': 0}).exec()
+        .then((follows) => {
+            return follows;
+        })
+        .catch((err) => {
+            return handleError(err);
+        });
+     
+    var following_clean = [];
+     
+    following.forEach((follow)=>{
+        following_clean.push(follow.followed);
+    });
+    var followed_clean = [];
+     
+    followed.forEach((follow)=>{
+        followed_clean.push(follow.user);
+    });
+
+    return {
+        following: following_clean,
+        followed:followed_clean}
 }
 
 // Listar todos los usuarios que nos han seguido
@@ -77,10 +115,15 @@ function get_followed_users(req, res) {
     Follow.find({followed: userId}).populate('user').paginate(page, items_per_page, (err, follows, total) => {
         if (err) return res.status(500).send({message:'Error en el servidor'});
         if (!follows) return res.status(404).send({message:'No te sigue ningún usuario'});
-        return res.status(200).send({
-            total: total,
-            pages: Math.ceil(total/items_per_page),
-            follows
+        
+        follow_users_ids(req.user.sub).then((response) => {
+            return res.status(200).send({
+                total: total,
+                pages: Math.ceil(total/items_per_page),
+                follows,
+                users_following: response.following, 
+                users_followed: response.followed
+            });
         });
     });
 }

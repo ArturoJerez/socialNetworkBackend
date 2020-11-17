@@ -6,7 +6,7 @@
  * Nos permite crear, ver, modificar y eliminar publicaciones de los usuarios
  */
 
-var path = require('path');
+const path = require('path');
 var fs = require('fs');
 var moment = require('moment');
 var mongoosePaginate = require('mongoose-pagination');
@@ -14,12 +14,6 @@ var mongoosePaginate = require('mongoose-pagination');
 var Publication = require('../models/publication');
 var User = require('../models/user');
 var Follow = require('../models/follow');
-
-function probando(req, res) {
-    res.status(200).send({
-        message: 'Hola desde publicaciones'
-    });
-}
 
 // Crea una nueva publicación de usuario
 function save_publication(req, res) {
@@ -71,6 +65,34 @@ function get_publications(req, res) {
             });
         });
     
+    });
+}
+
+function get_publications_user(req, res) {
+    var page = 1;
+    if(req.params.page){
+        page = req.params.page;
+    }
+
+    var user = req.user.sub;
+    if(req.params.user) {
+        user = req.params.user;
+    }
+    
+    var items_per_page = 4;
+    
+    // Busca las publicaciones del usuario seguido
+    Publication.find({user: user}).sort('-created_at').populate('user').paginate(page, items_per_page, (err, publications, total) => {
+    	if(err) return res.status(500).send({message: 'Error al devolver las publicaciones'});
+        if(!publications) return res.status(404).send({message: 'No hay publicaciones'});
+    
+    	return res.status(200).send({
+                total_items: total,
+                pages: Math.ceil(total/items_per_page),
+                page: page,
+                items_per_page: items_per_page,
+                publications
+        });
     });
 }
 
@@ -147,9 +169,9 @@ function get_image_file(req, res) {
 }
 
 module.exports = {
-    probando,
     save_publication,
     get_publications,
+    get_publications_user,
     get_publication,
     remove_publication,
     upload_image,
