@@ -9,10 +9,6 @@ var User = require('../models/user');
 var Follow = require('../models/follow');
 var Message = require('../models/message');
 
-function probando(req, res) {
-    res.status(200).send({message: 'Hola desde modelo message'});
-}
-
 // Crea y envía un mensaje a un usuario
 function save_message(req, res) {
     var params = req.body;
@@ -43,8 +39,8 @@ function get_received_messages(req, res) {
         page = req.params.page;
     }
 
-    var items_per_page = 4;
-    Message.find({receiver: userId}).populate('emitter', 'name surname _id nick image').paginate(page, items_per_page, (err, messages, total) => {
+    var items_per_page = 8;
+    Message.find({receiver: userId}).populate('emitter', 'name surname _id nick image').sort('-created_at').paginate(page, items_per_page, (err, messages, total) => {
         if(err) return res.status(500).send({message: 'Error en la petición'});
         if(!messages) return res.status(404).send({message: 'No hay mensajes'});
         return res.status(200).send({
@@ -65,8 +61,8 @@ function get_emitted_messages(req, res) {
         page = req.params.page;
     }
 
-    var items_per_page = 4;
-    Message.find({emitter: userId}).populate('emitter receiver', 'name surname _id nick image').paginate(page, items_per_page, (err, messages, total) => {
+    var items_per_page = 8;
+    Message.find({emitter: userId}).populate('emitter receiver', 'name surname _id nick image').sort('-created_at').paginate(page, items_per_page, (err, messages, total) => {
         if(err) return res.status(500).send({message: 'Error en la petición'});
         if(!messages) return res.status(404).send({message: 'No hay mensajes'});
         return res.status(200).send({
@@ -81,7 +77,7 @@ function get_emitted_messages(req, res) {
 // Lista la cantidad de mensajes sin leer
 function get_unviewed_messages(req, res) {
     var userId = req.user.sub;
-    Message.count({receiver: userId, viewed: 'false'}).exec()
+    Message.countDocuments({receiver: userId, viewed: 'false'}).exec()
     .then((count) => {
         return res.status(200).send({
             'unviewed': count
@@ -103,11 +99,32 @@ function set_viewed_messages(req, res) {
     })
 }
 
+// Elimina el mensaje recibido
+function remove_message_receiver(req, res) {
+    var userId = req.user.sub;
+
+    Message.findOne({receiver: userId}).deleteOne(err => {
+        if(err) return res.status(500).send({message: 'Error al eliminar el mensaje'});
+        return res.status(200).send({message: 'Mensaje eliminado correctamente'});
+    });
+}
+
+// Elimina el mensaje recibido
+function remove_message_emitter(req, res) {
+    var userId = req.user.sub;
+
+    Message.findOne({emitter: userId}).deleteOne(err => {
+        if(err) return res.status(500).send({message: 'Error al eliminar el mensaje'});
+        return res.status(200).send({message: 'Mensaje eliminado correctamente'});
+    });
+}
+
 module.exports = {
-    probando,
     save_message,
     get_received_messages,
     get_emitted_messages,
     get_unviewed_messages,
-    set_viewed_messages
+    set_viewed_messages,
+    remove_message_receiver,
+    remove_message_emitter
 }
