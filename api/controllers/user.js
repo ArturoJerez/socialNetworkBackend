@@ -29,6 +29,7 @@ function save_user(req, res) {
             user.email = params.email;
             user.role = 'ROLE_USER';
             user.image = null;
+            user.hobbies = [];
 
             User.find({ $or: [ // Comprobar si ya existe un usuario con email o nick
                             {email: user.email.toLowerCase()},
